@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Title Correlation Matrix — Netflix Viewing Analytics</title>
+<style>
+  :root{
+    --bg-900:#0A0A0A;
+    --bg-800:#141414;
+    --surface-700:#1F1F1F;
+    --surface-600:#2A2A2A;
+    --border-600:#333333;
+    --text-100:#F5F5F1;
+    --text-300:#C7C7C2;
+    --text-500:#8C8C86;
+    --nx-red:#E50914;
+    --nx-red-700:#B00610;
+    --accent:#F2B705;
+    --cool-400:#2E8CB0;
+    --focus-ring:#4FB3FF;
+    --radius:10px;
+    --shadow:0 2px 4px rgba(0,0,0,0.4), 0 10px 26px rgba(0,0,0,0.35);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--bg-900);
+    color:var(--text-100);
+    font-family:-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+  }
+  .sr-only{
+    position:absolute; width:1px; height:1px; padding:0; margin:-1px;
+    overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0;
+  }
+  a:focus-visible, button:focus-visible, [tabindex]:focus-visible{
+    outline:3px solid var(--focus-ring); outline-offset:2px;
+  }
+
+  header.masthead{
+    background:linear-gradient(180deg, #000 0%, var(--bg-800) 100%);
+    border-bottom:1px solid var(--border-600);
+    padding:18px clamp(16px,4vw,40px);
+  }
+  .masthead-inner{
+    max-width:1200px; margin:0 auto;
+    display:flex; align-items:center; gap:18px; flex-wrap:wrap;
+  }
+  .wordmark{
+    font-weight:800; font-size:1.5rem; letter-spacing:-0.02em;
+    color:var(--nx-red); flex-shrink:0;
+    font-family: Georgia, "Times New Roman", serif;
+  }
+  .masthead-text h1{
+    margin:0 0 2px; font-size:clamp(1.25rem,2.6vw,1.65rem); font-weight:700; letter-spacing:-0.01em;
+  }
+  .masthead-text p{ margin:0; font-size:0.92rem; color:var(--text-300); }
+  .eyebrow{
+    text-transform:uppercase; letter-spacing:0.1em; font-size:0.7rem; font-weight:700;
+    color:var(--nx-red);
+  }
+
+  main{ max-width:1200px; margin:0 auto; padding:clamp(16px,4vw,32px); }
+
+  .caption-card{
+    background:var(--surface-700); border:1px solid var(--border-600); border-radius:var(--radius);
+    padding:18px 20px; margin-bottom:22px;
+  }
+  .caption-card h2{ margin:0 0 8px; font-size:1rem; color:#fff; }
+  .caption-card p{ margin:0; font-size:0.92rem; color:var(--text-300); max-width:80ch; }
+  .caption-card p + p{ margin-top:8px; }
+
+  .panel{
+    background:var(--surface-700); border:1px solid var(--border-600); border-radius:var(--radius);
+    box-shadow:var(--shadow); padding:clamp(14px,3vw,26px);
+  }
+  .panel-head{ display:flex; justify-content:space-between; align-items:baseline; flex-wrap:wrap; gap:8px; margin-bottom:16px; }
+  .panel-head h2{ margin:0; font-size:1.05rem; color:#fff; }
+  .panel-head .meta{ font-size:0.82rem; color:var(--text-500); }
+
+  .matrix-scroll{ overflow-x:auto; padding-bottom:6px; }
+  .matrix-scroll svg{ display:block; }
+
+  .legend{ display:flex; align-items:center; gap:10px; margin-top:18px; font-size:0.78rem; color:var(--text-300); flex-wrap:wrap; }
+  .legend .bar{
+    width:min(340px,100%); height:14px; border-radius:7px;
+    background:linear-gradient(90deg,
+      #2E8CB0 0%, #6FAFC2 22%, #A9BFB9 42%, #23201D 50%,
+      #6B3230 58%, #A62F1F 78%, var(--nx-red) 100%);
+    border:1px solid var(--border-600); flex-shrink:0;
+  }
+  .legend-labels{ display:flex; justify-content:space-between; width:min(340px,100%); font-size:0.72rem; }
+
+  .genre-key{ margin-top:18px; font-size:0.8rem; color:var(--text-300); }
+  .genre-key ul{ list-style:none; margin:8px 0 0; padding:0; display:flex; flex-wrap:wrap; gap:6px 14px; }
+  .genre-key li span.dot{ display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:6px; background:var(--accent); }
+
+  footer{ max-width:1200px; margin:0 auto; padding:0 clamp(16px,4vw,32px) 32px; font-size:0.78rem; color:var(--text-500); }
+
+  @media (max-width:560px){
+    .wordmark{ font-size:1.2rem; }
+    .masthead-text h1{ font-size:1.1rem; }
+  }
+</style>
+</head>
+<body>
+
+<header class="masthead">
+  <div class="masthead-inner">
+    <div class="wordmark" aria-hidden="true">NETFLIX</div>
+    <div class="masthead-text">
+      <div class="eyebrow">Viewing Analytics &middot; Content Strategy</div>
+      <h1>Title Correlation Matrix</h1>
+      <p>Which titles get watched by the same subscribers, based on viewing time</p>
+    </div>
+  </div>
+</header>
+
+<main>
+  <section class="caption-card" aria-labelledby="method-heading">
+    <h2 id="method-heading">How to read this</h2>
+    <p id="method-caption">
+      For every subscriber we totalled how many minutes they spent watching each title (episodes
+      watched &times; episode length), then measured how closely two titles' viewing time rises and
+      falls together across all subscribers (a Pearson correlation, from &minus;1 to +1). A value
+      near +1 means subscribers who spend more time on one title tend to also spend more time on
+      the other &mdash; a strong "watch both" pair. A value near 0 means the two titles' audiences
+      barely overlap in how much time they give each.
+    </p>
+    <p>
+      Titles are ordered on both axes by genre group (sitcom, K-drama romance, crime &amp;
+      thriller, supernatural) rather than alphabetically, using the genre tags in the source data,
+      so titles that share an audience sit next to each other on the diagonal.
+    </p>
+  </section>
+
+  <section class="panel" aria-labelledby="matrix-heading">
+    <div class="panel-head">
+      <h2 id="matrix-heading">Viewing-time correlation between titles</h2>
+      <span class="meta" id="n-meta"></span>
+    </div>
+
+    <div class="matrix-scroll" id="matrix-scroll"></div>
+
+    <div class="legend">
+      <span>Correlation of per-subscriber viewing time:</span>
+    </div>
+    <div class="bar" role="img" aria-label="Diverging colour scale from cool blue at negative one, through dark neutral at zero, to Netflix red at positive one"></div>
+    <div class="legend-labels">
+      <span>&minus;1.0 (unrelated audiences)</span>
+      <span>0 (no relationship)</span>
+      <span>+1.0 (watched together)</span>
+    </div>
+
+    <div class="genre-key" id="genre-key">
+      <strong>Genre tags (from source data):</strong>
+      <ul id="genre-key-list"></ul>
+    </div>
+
+    <table class="sr-only" id="sr-table">
+      <caption>Pearson correlation of per-subscriber viewing minutes, title by title</caption>
+    </table>
+  </section>
+
+  <footer>
+    Method: Pearson correlation of per-subscriber viewing minutes (episodes watched &times; episode
+    length) by title. Data: subscriber viewing logs across 9 titles, 2,000 subscribers. Static,
+    self-contained analytics page &mdash; no external data calls.
+  </footer>
+</main>
+
+<script>
+(function(){
+  var DATA = {"shows":["Big Bang Theory","Queen Of Tears","It's Okay To Not Be Okay","You","Dexter","Dahmer","Stranger Things","Dark","Umbrella Academy"],"corr":[[1.0,-0.0404,-0.0337,-0.0054,-0.0001,-0.0095,-0.0378,-0.034,-0.0334],[-0.0404,1.0,0.8656,0.0055,0.0159,0.0079,-0.0151,0.0047,0.0054],[-0.0337,0.8656,1.0,-0.0069,0.0016,-0.0031,-0.0052,0.001,0.0014],[-0.0054,0.0055,-0.0069,1.0,0.9216,0.9498,0.0047,-0.007,-0.0039],[-0.0001,0.0159,0.0016,0.9216,1.0,0.8211,0.017,0.0011,0.0042],[-0.0095,0.0079,-0.0031,0.9498,0.8211,1.0,-0.0012,-0.0117,-0.0084],[-0.0378,-0.0151,-0.0052,0.0047,0.017,-0.0012,1.0,0.8367,0.8469],[-0.034,0.0047,0.001,-0.007,0.0011,-0.0117,0.8367,1.0,0.9594],[-0.0334,0.0054,0.0014,-0.0039,0.0042,-0.0084,0.8469,0.9594,1.0]],"genres":{"Big Bang Theory":["Sitcom","Comedy"],"Queen Of Tears":["Drama","Romance"],"It's Okay To Not Be Okay":["Drama","Romance"],"You":["Drama","Thriller"],"Dexter":["Crime","Drama"],"Dahmer":["Crime","Drama","Thriller"],"Stranger Things":["Super Natural","Horror","Adventure"],"Dark":["Drama","Thriller","Super Natural"],"Umbrella Academy":["Drama","Adventure","Action"]},"avg_minutes":{"Big Bang Theory":3024.7,"Queen Of Tears":1538.6,"It's Okay To Not Be Okay":1549.2,"You":3015.6,"Dexter":2999.9,"Dahmer":3015.8,"Stranger Things":2037.1,"Dark":2036.8,"Umbrella Academy":2035.3},"episode_length":{"Big Bang Theory":23,"Queen Of Tears":75,"It's Okay To Not Be Okay":77,"You":55,"Dexter":55,"Dahmer":50,"Stranger Things":66,"Dark":65,"Umbrella Academy":65},"n_subscribers":2000};
+
+  document.getElementById('n-meta').textContent = 'n = ' + DATA.n_subscribers + ' subscribers \u00b7 ' + DATA.shows.length + ' titles';
+
+  // ---- genre key ----
+  var allGenres = [];
+  DATA.shows.forEach(function(s){ DATA.genres[s].forEach(function(g){ if(allGenres.indexOf(g)===-1) allGenres.push(g); }); });
+  var keyList = document.getElementById('genre-key-list');
+  allGenres.forEach(function(g){
+    var li = document.createElement('li');
+    li.innerHTML = '<span class="dot" aria-hidden="true"></span>' + g;
+    keyList.appendChild(li);
+  });
+
+  // ---- colour scale: diverging cool blue -> dark neutral -> Netflix red ----
+  function lerp(a,b,t){ return a + (b-a)*t; }
+  function mix(c1,c2,t){ return [ Math.round(lerp(c1[0],c2[0],t)), Math.round(lerp(c1[1],c2[1],t)), Math.round(lerp(c1[2],c2[2],t)) ]; }
+  var NEG = [46,140,176];    // cool blue
+  var MID = [35,32,29];      // dark neutral
+  var POS = [229,9,20];      // Netflix red
+  function colourFor(v){
+    v = Math.max(-1, Math.min(1, v));
+    var rgb = v < 0 ? mix(NEG, MID, 1 + v) : mix(MID, POS, v);
+    return 'rgb(' + rgb.join(',') + ')';
+  }
+  function luminance(rgb){
+    var a = rgb.map(function(c){ c/=255; return c<=0.03928 ? c/12.92 : Math.pow((c+0.055)/1.055,2.4); });
+    return 0.2126*a[0]+0.7152*a[1]+0.0722*a[2];
+  }
+  function textColourFor(v){
+    v = Math.max(-1, Math.min(1, v));
+    var rgb = v < 0 ? mix(NEG, MID, 1+v) : mix(MID, POS, v);
+    var L = luminance(rgb);
+    var contrastBlack = (L + 0.05) / 0.05;
+    var contrastWhite = 1.05 / (L + 0.05);
+    return contrastBlack > contrastWhite ? '#0A0A0A' : '#FFFFFF';
+  }
+
+  var shows = DATA.shows, n = shows.length, corr = DATA.corr;
+  var isMobile = window.innerWidth < 640;
+  var cell = isMobile ? 46 : 60;
+  var labelColW = isMobile ? 118 : 168;
+  var labelRowH = isMobile ? 118 : 168;
+  var pad = 6;
+  var W = labelColW + n*cell + pad;
+  var H = labelRowH + n*cell + pad;
+
+  var svgNS = 'http://www.w3.org/2000/svg';
+  var svg = document.createElementNS(svgNS,'svg');
+  svg.setAttribute('viewBox','0 0 ' + W + ' ' + H);
+  svg.setAttribute('width', W);
+  svg.setAttribute('height', H);
+  svg.setAttribute('aria-hidden','true');
+
+  function el(tag, attrs){
+    var e = document.createElementNS(svgNS, tag);
+    for(var k in attrs) e.setAttribute(k, attrs[k]);
+    return e;
+  }
+
+  for(var c=0;c<n;c++){
+    var x = labelColW + c*cell + cell/2;
+    var t = el('text', {
+      x:x, y:labelRowH-10, 'text-anchor':'start',
+      transform:'rotate(-45 '+x+' '+(labelRowH-10)+')',
+      'font-size': isMobile ? 11 : 12.5, fill:'#F5F5F1'
+    });
+    t.textContent = shows[c];
+    svg.appendChild(t);
+  }
+  for(var r=0;r<n;r++){
+    var y = labelRowH + r*cell + cell/2;
+    var t2 = el('text', { x: labelColW-10, y:y+4, 'text-anchor':'end', 'font-size': isMobile ? 11 : 12.5, fill:'#F5F5F1' });
+    t2.textContent = shows[r];
+    svg.appendChild(t2);
+  }
+  for(var r2=0;r2<n;r2++){
+    for(var c2=0;c2<n;c2++){
+      var v = corr[r2][c2];
+      var cx = labelColW + c2*cell;
+      var cy = labelRowH + r2*cell;
+      var rect = el('rect', { x:cx, y:cy, width:cell-2, height:cell-2, rx:3, fill: colourFor(v), stroke:'#0A0A0A', 'stroke-width':1.5 });
+      var titleEl = el('title', {});
+      titleEl.textContent = shows[r2] + ' \u00d7 ' + shows[c2] + ': r = ' + v.toFixed(2);
+      rect.appendChild(titleEl);
+      svg.appendChild(rect);
+
+      var txt = el('text', {
+        x: cx + (cell-2)/2, y: cy + (cell-2)/2 + 4.5, 'text-anchor':'middle',
+        'font-size': isMobile ? 10 : 11.5, 'font-weight': r2===c2 ? 700 : 500,
+        fill: textColourFor(v)
+      });
+      txt.textContent = v.toFixed(2);
+      svg.appendChild(txt);
+    }
+  }
+
+  document.getElementById('matrix-scroll').appendChild(svg);
+
+  // accessible data table
+  var table = document.getElementById('sr-table');
+  var thead = document.createElement('thead');
+  var hr = document.createElement('tr');
+  hr.appendChild(document.createElement('th'));
+  shows.forEach(function(l){ var th = document.createElement('th'); th.scope='col'; th.textContent = l; hr.appendChild(th); });
+  thead.appendChild(hr);
+  table.appendChild(thead);
+  var tbody = document.createElement('tbody');
+  shows.forEach(function(l, i){
+    var row = document.createElement('tr');
+    var th = document.createElement('th'); th.scope='row'; th.textContent = l;
+    row.appendChild(th);
+    shows.forEach(function(l2, j){
+      var td = document.createElement('td');
+      td.textContent = corr[i][j].toFixed(2);
+      row.appendChild(td);
+    });
+    tbody.appendChild(row);
+  });
+  table.appendChild(tbody);
+})();
+</script>
+</body>
+</html>
